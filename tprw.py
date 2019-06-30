@@ -1,12 +1,15 @@
-import requests
+import browser_cookie3
+import bs4
+import grequests
 import json
-import threading
+import os
 import queue
 import re
-import os
-import tempfile
-import webbrowser
+import requests
 import sys
+import tempfile
+import threading
+import webbrowser
 
 ### SETTINGS ###
 load_from_file = True
@@ -51,7 +54,7 @@ def get_replays(results, replay_type):
         f.write(response.text)
     print('torebadata_' + replay_type + ' writen!')
 
-def get_links(prize_id):
+def get_links(prize_id, prize_name):
     url = 'http://tools.torebaprizewatcher.com/serverside/get_prize_detail.php'
     headers = {
         'Pragma': 'no-cache',
@@ -73,12 +76,37 @@ def get_links(prize_id):
     data = response.text
     data = json.loads(data)
     if 'data' in data:
+        toreba_urls = []
         data = data['data']
+        cookies = browser_cookie3.firefox(domain_name='www.toreba.net')
+        for item in data:
+            headers = {
+                'Connection': 'keep-alive',
+                'Pragma': 'no-cache',
+                'Cache-Control': 'no-cache',
+                'Upgrade-Insecure-Requests': '1',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
+                'DNT': '1',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'en-US,en;q=0.9,th;q=0.8',
+                'Referer': item['replay_url']
+            }
+            toreba_urls.append(grequests.get(item['replay_url'], headers=headers, cookies=cookies))
+        responses = grequests.map(toreba_urls)
+        
         with open('tmp.html', 'w') as tmp:
-            tmp.write('<html><ul>')
-            for item in data:
-                tmp.write('<li><a href="{}" target="_blank">{}</a></li>'.format(item['replay_url'], item['replay_url']))
-            tmp.write('</ul></html>')
+            tmp.write('<html><h1 style="text-align:center;">{}: {}</h1>'.format(prize_id, prize_name))
+            i = 1
+            for response in responses:
+                html = bs4.BeautifulSoup(response.text, 'html.parser')
+                video_elem = html.select('.factors_replay video source')
+                tmp.write('<div style="display:flex; justify-content:center ;margin-bottom:30px;">')
+                tmp.write('<div style="font-size:36px; margin-right:10px;">{}</div>'.format(i))
+                tmp.write('<video src="{}" controls></video>'.format(video_elem[0]['src']))
+                tmp.write('</div>')
+                i += 1
+            tmp.write('</html>')
         webbrowser.open_new_tab('tmp.html')
     else:
         print('No replays')
@@ -135,21 +163,22 @@ if __name__ == '__main__':
     #print_list(prizes)
 
     while True:
-        user_input = input('s <search term> to search, <id> to show replay urls, q to quit: ')
-        if user_input.startswith('s'):
-            user_input = user_input[2:]
+        user_input = input('default search | <id> to show replays | q to quit: ')
+        if user_input.isdigit() and len(user_input) <= 5:  # id should be less than 5 digits
+            for prize in prizes:
+                if prize['id'] == user_input:
+                    get_links(user_input, prize['name'])
+        elif user_input == 'q':  # quit program
+            try:
+                os.remove('tmp.html')
+            except:
+                pass
+            break
+        else:  #default search
             filtered = []
             for prize in prizes:
                 if re.match('.*' + user_input + '.*', prize['name'], re.IGNORECASE):
                     filtered.append(prize)
             for item in filtered:
                 print('{: >5}: {}'.format(item['id'], item['name']))
-        elif user_input == 'q':
-            try:
-                os.remove('tmp.html')
-            except:
-                pass
-            break
-        else:
-            get_links(user_input)
         

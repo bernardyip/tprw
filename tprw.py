@@ -78,7 +78,7 @@ def get_links(prize_id, prize_name):
     if 'data' in data:
         toreba_urls = []
         data = data['data']
-        cookies = browser_cookie3.firefox(domain_name='www.toreba.net')
+        cookies = browser_cookie3.chrome()
         for item in data:
             headers = {
                 'Connection': 'keep-alive',
@@ -103,7 +103,7 @@ def get_links(prize_id, prize_name):
                 video_elem = html.select('.factors_replay video source')
                 tmp.write('<div style="display:flex; justify-content:center ;margin-bottom:30px;">')
                 tmp.write('<div style="font-size:36px; margin-right:10px;">{}</div>'.format(i))
-                tmp.write('<video src="{}" controls></video>'.format(video_elem[0]['src']))
+                tmp.write('<video preload="auto" src="{}" controls></video>'.format(video_elem[0]['src']))
                 tmp.write('</div>')
                 i += 1
             tmp.write('</html>')

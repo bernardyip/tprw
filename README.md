@@ -10,7 +10,8 @@ To pull data, start with `-f` flag
 Otherwise just run it as a standard python script and search/enter Ids accordingly
 
 # Dependencies
-beautifulsoup4
-browser_cookie3
-grequests
-requests
+
+- beautifulsoup4
+- browser_cookie3
+- grequests
+- requests

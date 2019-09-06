@@ -100,7 +100,7 @@ def get_links(prize_id, prize_name):
             i = 1
             for response in responses:
                 html = bs4.BeautifulSoup(response.text, 'html.parser')
-                video_elem = html.select('.factors_replay video source')
+                video_elem = html.select('video source')
                 tmp.write('<div style="display:flex; justify-content:center ;margin-bottom:30px;">')
                 tmp.write('<div style="font-size:36px; margin-right:10px;">{}</div>'.format(i))
                 tmp.write('<video preload="auto" src="{}" controls></video>'.format(video_elem[0]['src']))

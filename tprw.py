@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import webbrowser
+import unicodedata
 
 ### SETTINGS ###
 load_from_file = True
@@ -36,11 +37,15 @@ def get_replays(results, replay_type):
     added_prize_ids = []
     prizes = []
     data = '[]'
+
+    # keep retrieving until there is data
     while data == '[]':
         response = requests.get(url, headers=headers, params=params)
         data = response.text
         if data == '[]':
             print('Empty result returned, retrying')
+
+    # data finally loaded, time to parse it for searching
     data = json.loads(data)['data']
     for item in data:
         prize_id = item['id']
@@ -49,10 +54,12 @@ def get_replays(results, replay_type):
             added_prize_ids.append(prize_id)
             prizes.append({'id': prize_id, 'name': prize_name})
     results.put(prizes)
-    #Save the data
+    
+    # save the data
     with open('torebadata_' + replay_type, 'w+') as f:
         f.write(response.text)
     print('torebadata_' + replay_type + ' writen!')
+
 
 def get_links(prize_id, prize_name):
     url = 'http://tools.torebaprizewatcher.com/serverside/get_prize_detail.php'
@@ -75,6 +82,7 @@ def get_links(prize_id, prize_name):
     response = requests.get(url, headers=headers, params=params)
     data = response.text
     data = json.loads(data)
+
     if 'data' in data:
         toreba_urls = []
         data = data['data']
@@ -94,23 +102,30 @@ def get_links(prize_id, prize_name):
             }
             toreba_urls.append(grequests.get(item['replay_url'], headers=headers, cookies=cookies))
         responses = grequests.map(toreba_urls)
-        
-        with open('tmp.html', 'w') as tmp:
-            tmp.write('<html><h1 style="text-align:center;">{}: {}</h1>'.format(prize_id, prize_name))
-            i = 1
-            for response in responses:
-                html = bs4.BeautifulSoup(response.text, 'html.parser')
-                video_elem = html.select('video source')
-                tmp.write('<div style="display:flex; justify-content:center ;margin-bottom:30px;">')
-                tmp.write('<div style="font-size:36px; margin-right:10px;">{}</div>'.format(i))
-                tmp.write('<video preload="auto" src="{}" controls></video>'.format(video_elem[0]['src']))
-                tmp.write('</div>')
-                i += 1
-            tmp.write('</html>')
-        webbrowser.open_new_tab('tmp.html')
+
+        # build html response
+        html_response = '<h1 style="text-align:center;">{}: {}</h1>'.format(prize_id, prize_name)
+        html_response += '<div style="display:flex;flex-wrap:wrap;justify-content:center;">'
+        for i, response in enumerate(responses):
+            html = bs4.BeautifulSoup(response.text, 'html.parser')
+            video_elem = html.select_one('video source')
+            video_date = html.select_one('.uploadtime_replay.p8')
+            # extract the time only, remove other characters
+            video_date = re.sub('[^0-9\-\: ]', '', video_date.text)
+
+            html_response += '<div style="margin:30px;display:flex;flex-direction:row;">'
+            html_response += '<div>'
+            html_response += '<div style="font-size:36px;margin-right:10px;">{}</div>'.format(i + 1)
+            html_response += '<div style="font-size:12px;margin-right:10px;">{}</div>'.format(video_date)
+            html_response += '</div>'
+            html_response += '<video preload="auto" src="{}" controls></video>'.format(video_elem['src'])
+            html_response += '</div>'
+        html_response += '</div>'
+        return html_response
     else:
-        print('No replays')
-    
+        print('No replays for {}-{}'.format(prize_id, prize_name))
+        return ''
+
 
 def print_list(prizes):
     prize_list = ''
@@ -160,25 +175,48 @@ if __name__ == '__main__':
                     added_prize_ids.append(prize['id'])
                     prizes.append(prize)
 
-    #print_list(prizes)
-
+    id_regex = r'(\d{5})+'
     while True:
-        user_input = input('default search | <id> to show replays | q to quit: ')
-        if user_input.isdigit() and len(user_input) <= 5:  # id should be less than 5 digits
+        user_input = input('default search | <id/list of ids> to show replays | q to quit: ')
+        if re.match(id_regex, user_input, re.IGNORECASE): # list of ids
+            user_input = user_input.split(' ')
+
+            # open tmp file for writing
+            tmp_file = open('tmp.html', 'w')
+            tmp_file.write('<html>')
+            
             for prize in prizes:
-                if prize['id'] == user_input:
-                    get_links(user_input, prize['name'])
-        elif user_input == 'q':  # quit program
-            try:
-                os.remove('tmp.html')
-            except:
-                pass
+                if prize['id'] in user_input:
+                    data = get_links(prize['id'], prize['name'])
+                    tmp_file.write(data)
+
+            # finish writing data to tmp file
+            tmp_file.write('</html>')
+            tmp_file.close()
+            # open tmp file in webbrowser
+            webbrowser.open_new_tab('tmp.html')
+                    
+        elif user_input == 'q':
+            # quit program
             break
-        else:  #default search
+        else:
+            # default search
             filtered = []
+            # all search terms must match, IMPLICIT AND style
+            # e.g. If the prize name is 'Sumikkogurashi mug cup'
+            # input = ['Summikogurashi', 'mug', 'cup'], match passes
+            # input = ['Summikogurashi', 'mug', 'cup2'], match will fail
+            user_input = user_input.split(' ')
             for prize in prizes:
-                if re.match('.*' + user_input + '.*', prize['name'], re.IGNORECASE):
+                is_all_match = True
+                for user_input_item in user_input:
+                    if not re.match('.*' + user_input_item + '.*', prize['name'], re.IGNORECASE):
+                        is_all_match = False
+                        break
+                if is_all_match:
                     filtered.append(prize)
+
+            # pretty format to console
             for item in filtered:
                 print('{: >5}: {}'.format(item['id'], item['name']))
         

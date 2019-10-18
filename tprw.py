@@ -1,5 +1,6 @@
 import browser_cookie3
 import bs4
+import collections
 import grequests
 import json
 import os
@@ -11,6 +12,7 @@ import tempfile
 import threading
 import webbrowser
 import unicodedata
+
 
 ### SETTINGS ###
 load_from_file = True
@@ -174,6 +176,12 @@ if __name__ == '__main__':
                 if not prize['id'] in added_prize_ids:
                     added_prize_ids.append(prize['id'])
                     prizes.append(prize)
+                    
+    # fix prize names (multiple spaces)
+    for prize in prizes:
+        prize['name'] = re.sub(r'\s{2,}', ' ', prize['name'])
+    # sort the listing so it will be easier to find relevant prizes
+    prizes = sorted(prizes, key=lambda kv: kv['name'])
 
     id_regex = r'(\d{5})+'
     while True:
@@ -218,5 +226,5 @@ if __name__ == '__main__':
 
             # pretty format to console
             for item in filtered:
-                print('{: >5}: {}'.format(item['id'], item['name']))
+                print('{: >5}  |  {}'.format(item['id'], item['name']))
         

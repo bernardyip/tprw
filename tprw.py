@@ -125,7 +125,7 @@ def get_links(prize_id, prize_name):
         html_response += '</div>'
         return html_response
     else:
-        print('No replays for {}-{}'.format(prize_id, prize_name))
+        print('No replays for {} - {}'.format(prize_id, prize_name))
         return ''
 
 
@@ -185,7 +185,7 @@ if __name__ == '__main__':
 
     id_regex = r'(\d{5})+'
     while True:
-        user_input = input('default search | <id/list of ids> to show replays | q to quit: ')
+        user_input = input('default search | <id/list of ids> to show replays | a to display last results | q to quit\n> ')
         if re.match(id_regex, user_input, re.IGNORECASE): # list of ids
             user_input = user_input.split(' ')
 
@@ -207,6 +207,23 @@ if __name__ == '__main__':
         elif user_input == 'q':
             # quit program
             break
+        elif user_input == 'a':
+            # open tmp file for writing
+            tmp_file = open('tmp.html', 'w')
+            tmp_file.write('<html>')
+            
+            # search for each item in the filtered results
+            for item in filtered:
+                for prize in prizes:
+                    if prize['id'] in item['id']:
+                        data = get_links(prize['id'], prize['name'])
+                        tmp_file.write(data)
+
+            # finish writing data to tmp file
+            tmp_file.write('</html>')
+            tmp_file.close()
+            # open tmp file in webbrowser
+            webbrowser.open_new_tab('tmp.html')
         else:
             # default search
             filtered = []

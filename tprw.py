@@ -215,7 +215,7 @@ if __name__ == '__main__':
             # search for each item in the filtered results
             for item in filtered:
                 for prize in prizes:
-                    if prize['id'] in item['id']:
+                    if prize['id'] == item['id']:
                         data = get_links(prize['id'], prize['name'])
                         tmp_file.write(data)
 
